@@ -1,0 +1,114 @@
+/*@!Encoding:65001*/
+/*
+Assertion and validation functions. Mostly to capsulate the existing
+CAPL functions. This is meant to clarify the usage of DOs and CAPL
+testing functions.
+*/
+
+// Set the lightswitch position by changing the value directly
+void setSwitch(int switchVal){
+  /*
+  0 = OFF; 1 = ON; 2 = AUTO
+  */
+  $LightControl_DO::BFC.LightCtrl.Input.LightSwitch = switchVal;
+}
+
+// Proxy function to wait until the headlight value matches an expected state
+// Returns 0 if match doesn't occur in specified maximumWaitTime
+// Returns 1 if match does occur
+// Returns value < 0 if error occurs
+int waitForHeadlightState(int expectedState, int maximumWaitTime){
+  int headlightReturn;
+  #if TOOL_MAJOR_VERSION < 16
+  // CANOE VERSION < 16
+  testWaitForTimeout(maximumWaitTime);
+  if ($LightControl_DO::BFC.LightCtrl.Output.HeadLight != expectedState){
+    return 0;
+  }
+  return 1;
+  
+  #else 
+  // CANOE VERSION >= 16
+  headlightReturn = testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.Output.HeadLight, expectedState, maximumWaitTime);
+  return headlightReturn;
+  
+  #endif
+}
+
+// Proxy function to wait until the switch value matches an expected state
+// Returns 0 if match doesn't occur in specified maximumWaitTime
+// Returns 1 if match does occur
+// Returns value < 0 if error occurs
+int waitForSwitchState(int expectedState, int maximumWaitTime){
+  int switchReturn;
+  #if TOOL_MAJOR_VERSION < 16
+  // CANOE VERSION < 16
+  testWaitForTimeout(maximumWaitTime);
+  if ($LightControl_DO::BFC.LightCtrl.Input.LightSwitch != expectedState){
+    return 0;
+  }
+  return 1;
+  
+  #else 
+  // CANOE VERSION >= 16
+  switchReturn = testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.Input.LightSwitch, expectedState, maximumWaitTime);
+  return switchReturn;
+  
+  #endif
+}
+
+// Function for validating a test setup. 
+// This function checks if both the state of the lightswitch and headlight match an expected value in a specified time interval.
+// Returns 0 if headlight and lightswitch match the expected values
+// Returns 1 if lightswitch does NOT match expected value or error occurred.
+// Returns 2 if lightswitch matches expected value but headlight does NOT match expected value or error occurred.
+int setupAndValidate(int plannedSwitchState, int plannedHeadlightState, int switchReactionTime, int headlightReactionTime){
+  const int cEpsilon = 100;
+  setSwitch(plannedSwitchState);
+  if (waitForSwitchState(plannedSwitchState, switchReactionTime) != 1){
+    return 1;
+  }
+  // Check if headlight changed according to switch change
+  // E.g. if switch is turned to 1 the headlight is expected to turn on as well respecting cycle time
+  if (waitForHeadlightState(plannedHeadlightState, headlightReactionTime) != 1){
+    return 2;    
+  }
+  testWaitForTimeout(cEpsilon); // Compensate for cycle time
+  return 0;
+}
+
+
+int waitForThresholdState (int expectedOffState, int expectedOnState, int tmout){
+  // Check if thresholds changed according to switch change
+  #if TOOL_MAJOR_VERSION < 16
+  // CANOE VERSION < 16
+  testWaitForTimeout(tmout);
+  
+  if ($LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOff.CurrentData != expectedOffState){
+    return 1;
+  }
+  if ($LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOn.CurrentData != expectedOnState){
+    return 2;
+  }
+  #else 
+  // CANOE VERSION >= 16
+  if (testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOff.CurrentData, expectedOffState, tmout) != 1){
+    return 1;
+  }
+  if (testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOn.CurrentData, expectedOnState, tmout) != 1){
+    return 2;    
+  }
+  #endif
+  testWaitForTimeout(100); // Compensate for cycle time
+  return 0;
+}
+
+// Initialize testing environment and configure AUTO setting
+void Initialize(){
+  // Switch ECU on and off
+  LightControl_DO::BFC.Controller.SwitchOff.CallAsync();
+  testWaitForTimeout(500);
+  LightControl_DO::BFC.Controller.SwitchOn.CallAsync();
+  testWaitForTimeout(500);
+}
+

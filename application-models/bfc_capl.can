@@ -1,0 +1,34 @@
+/*@!Encoding:65001*/
+includes
+{
+  
+}
+
+on start
+{
+    @sysvar::Interface::LightIntensity = 0;
+    FCT_UpdateLightIntensityLEDBar(0);
+}
+
+on sysvar Interface::LightIntensity
+{
+    FCT_UpdateLightIntensityLEDBar(@this);
+}
+
+void FCT_UpdateLightIntensityLEDBar(long aLightSensorIntensity)
+{
+    long aARGB;
+    byte aColorWeight;
+    
+    // calculate the weight of each R,G,B color based on LightSensorIntensity value
+    aColorWeight = (byte)( (aLightSensorIntensity*(byte)255) / (byte)100);
+        
+    // turn LEDBand1 to different levels
+    aARGB = MakeARGB(255, aColorWeight, aColorWeight, aColorWeight);
+    // update the corresponding sysvar
+    @sysvar::Interface::LightIntensityBand = aARGB;  
+}
+
+on fct_called LightControl_DO::BFC.LightCtrl.LightIntensity.LightIntensity {
+  this.io_signal = @sysvar::Interface::LightIntensity;
+}

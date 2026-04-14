@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<systemvariables version="4">
+  <namespace name="" comment="" interface="">
+    <namespace name="Interface" comment="" interface="">
+      <variable anlyzLocal="2" readOnly="false" valueSequence="false" unit="" name="ErrorCode" comment="" bitcount="32" isSigned="true" encoding="65001" type="int" startValue="0" minValue="0" minValuePhys="0" maxValue="4" maxValuePhys="4">
+        <valuetable name="ErrorCode" definesMinMax="true">
+          <valuetableentry value="0" lowerBound="0" upperBound="0" description="NoError" displayString="NoError" />
+          <valuetableentry value="1" lowerBound="1" upperBound="1" description="ErrorLightIntensity" displayString="ErrorLightIntensity" />
+          <valuetableentry value="2" lowerBound="2" upperBound="2" description="ErrorLightSwitch" displayString="ErrorLightSwitch" />
+          <valuetableentry value="3" lowerBound="3" upperBound="3" description="ErrorThreshold" displayString="ErrorThreshold" />
+          <valuetableentry value="4" lowerBound="4" upperBound="4" description="ErrorInvalidState" displayString="ErrorInvalidState" />
+        </valuetable>
+      </variable>
+      <variable anlyzLocal="2" readOnly="false" valueSequence="false" unit="" name="LightIntensity" comment="" bitcount="32" isSigned="false" encoding="65001" type="int" minValue="0" minValuePhys="0" maxValue="100" maxValuePhys="100" />
+      <variable anlyzLocal="2" readOnly="false" valueSequence="false" unit="" name="LightIntensityBand" comment="" bitcount="32" isSigned="false" encoding="65001" type="int" startValue="0">
+        <valuetable name="SVT_ON_OFF" definesMinMax="false">
+          <valuetableentry value="0" lowerBound="0" upperBound="0" description="OFF" displayString="OFF" />
+          <valuetableentry value="1" lowerBound="1" upperBound="1" description="ON" displayString="ON" />
+        </valuetable>
+      </variable>
+    </namespace>
+  </namespace>
+</systemvariables>

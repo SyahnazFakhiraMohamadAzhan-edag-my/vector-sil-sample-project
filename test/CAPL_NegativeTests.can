@@ -1,0 +1,78 @@
+/*@!Encoding:65001*/
+includes
+{
+  #include "CAPL_TestingFunctions.cin"
+}
+
+variables
+{
+  // Initialize all mandatory variables. Avoid initialization of variables in functions.
+  const int cHystOnDelay = 2000;  // Hysteresis time when switching on
+  const int cHystOffDelay = 3000; // Hysteresis time when switching off
+  const int cEpsilon = 100;       // cycleTime
+
+  // Initialization of helper and placeholder variables
+  long ret;
+  long checkErrorCode;
+
+  struct TestSetup
+  {
+    int initialLightIntensity;    // Light intensity before test start
+    int testLightIntensity;       // Light intensity during test
+    int initialLightSwitchState;  // Switch position before test start
+    int testLightSwitchState;     // Switch position during test
+    int initialHeadlightState;    // Headlight state before test start
+    int testHeadLightState;       // Planned/Expected headlight state during test
+  };
+  
+  struct TestSetup NegativeTests_TS_OnToInvalid_Dark= {0, 0, 1, 4, 1, 1};
+
+  char msgBuff [200];
+}
+
+void Callback_checkErrorCodeLswt(dword check)
+{
+  testCaseComment("LightSwitchErrorCheck failed as expected!");
+}
+
+// Negative testcase: Expect Error And Headlight To Be ON When Turning Lightswitch To Invalid Position
+export testcase OnToInvalid_Darkness(){
+  // Test setup and assurance
+  checkErrorCode = ChkStart_SignalValueChange(LightControl_DO::BFC.LightCtrl.Error.ErrorCode, "Callback_checkErrorCodeLswt");
+
+  testStep(0, "1.0", "Test setup: Headlight should stay on when switching to invalid switch position. Error should be raised.");
+  sysSetVariableInt(sysvar::Interface::LightIntensity, NegativeTests_TS_OnToInvalid_Dark.initialLightIntensity);
+  ret = setupAndValidate(NegativeTests_TS_OnToInvalid_Dark.initialLightSwitchState, NegativeTests_TS_OnToInvalid_Dark.initialHeadlightState, cEpsilon, cEpsilon);
+  if (ret != 0){
+    testStepFail(1, "1.0", "Setup of test could not be achieved.");
+    return;
+  }
+  testStepPass(1, "1.0", "Setup of test was achieved.");
+  
+  // Start testing
+  testStep(0, "2.0", "Test: Headlight should stay on when switching to invalid switch position. Error should be raised.");
+  
+  ret = setupAndValidate(NegativeTests_TS_OnToInvalid_Dark.testLightSwitchState, NegativeTests_TS_OnToInvalid_Dark.testHeadLightState, cEpsilon, cEpsilon);
+  if (ret == 1){  
+    testStepFail(1, "2.0", "Test failed because lightswitch couldn't be set correctly.");
+    return;
+  }
+  if (ret == 2) {
+    testStepFail(1, "2.0", "Test failed because headlight didn't stay the same.");
+    return;
+  }
+  testStepPass(1, "2.0", "Start of test succeeded. Lightswitch in INVALID position, headlight is ON.");
+  
+  testStep(0, "3.0", "Test: \"ErrorLightSwitch\" should have been raised.");
+  ret = ChkQuery_NumEvents(checkErrorCode);
+  if (ret != 1){  
+    testStepFail(1, "3.0", "Test failed because error was not raised.");
+    return;
+  }
+  testValidateImplValueUInt("3.0: Expecting LightSwitchError", LightControl_DO::BFC.LightCtrl.Error.ErrorCode, 2);
+
+  ChkControl_Reset(checkErrorCode);
+  ChkControl_Destroy(checkErrorCode);
+  testStepPass(1, "3.0", "Test passed. Lightswitch was set and error raised.");
+}
+

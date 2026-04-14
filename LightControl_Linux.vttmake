@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<BuildSpecification schemaVersion="7.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../../Programming/VTTMake/VttMakeFileSchema_7_0.xsd">
+    <!-- This vVIRTUALtarget make file is intended to describe an example for generating -->
+    <!-- a virtual ECU based on an emulated basis software stack - BSW Emulation use case -->
+	<Settings>
+        <ProjectName>LightControl</ProjectName>
+        <PortMonitoring FileRef="LightControl.vttpm"/>
+    </Settings>
+    <BuildBswEmulatedSut>
+        <EcuName>BFC</EcuName>
+        <SystemDescriptionFiles>
+            <File>LightCtrl.arxml</File>
+        </SystemDescriptionFiles>
+		<!-- Optional configuration of the emulated BSW modules. If not set default settings will be derived based on system description files. -->
+        <Configuration>
+            <ComM>
+                <TminFullComModeDuration>5</TminFullComModeDuration>
+                <NmLightTimeout>10</NmLightTimeout>
+                <RequestProcessingTime>0.01</RequestProcessingTime>
+            </ComM>
+            <EcuM>
+                <RunMinDuration>INF</RunMinDuration>
+                <DefaultShutdownTarget>Sleep</DefaultShutdownTarget>
+            </EcuM>
+            <TaskMappings>
+                <!-- Mapping of runnables to tasks. Tasks with higher priority are executed first.-->
+                <Task Name="Task" Priority="0">
+                    <!-- The ordering of the runnables is determined by their order within a task. -->
+                    <!-- Runnables with lower order are executed first (e.g. first runnable in the list will be executed first) -->
+                    <!-- Wilcards can be used for runnable paths. -->
+                    <MappedRunnable SwcPath="*" RunnableName="ErrorHandler_Init" />
+                    <MappedRunnable SwcPath="*::LightCtrl" RunnableName="LightCtrl" />
+                    <MappedRunnable SwcPath="*::ErrorHandler" RunnableName="OnError" />
+                </Task>
+            </TaskMappings>
+        </Configuration>
+        <ExecutionEnvironment>
+            <CommunicationInterface>DistributedObjects</CommunicationInterface>
+            <DataTypesNamespace>$(PROJECTNAME)_DO_Types</DataTypesNamespace>
+            <DataObjectsNamespace>$(PROJECTNAME)_DO</DataObjectsNamespace>
+        </ExecutionEnvironment>
+        <BuildSettings>
+            <VerboseLevel>High</VerboseLevel>
+        </BuildSettings>
+		<!-- Generates a CMake project based on the emulated BSW stack and the given source files. -->
+        <GenerateCMakeProject>
+            <SourceFiles>
+                <File>BFC\Appl\Source\ErrorHandler.c</File>
+                <File>BFC\Appl\Source\LightCtrl.c</File>
+            </SourceFiles>
+
+            <TargetPlatform>Linux_x64</TargetPlatform>
+            <CMakeGenerator>CLANG</CMakeGenerator>
+        </GenerateCMakeProject>
+        <BuildCMakeProject/>
+        <GenerateZip />
+    </BuildBswEmulatedSut>
+</BuildSpecification>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<DCF ARSCHEMA="460_DEV">
+	<Version>1.0</Version>
+	<PROFILESETTINGS>ProfileSettings.xml</PROFILESETTINGS>
+	<ADMINDATATEMPLATES>AdminDataTemplates.xml</ADMINDATATEMPLATES>
+	<FILEREF>
+		<ARXML>Packages.arxml</ARXML>
+	</FILEREF>
+	<FILEREF>
+		<ARXML>DataTypes.arxml</ARXML>
+	</FILEREF>
+	<FILEREF>
+		<ARXML>PortInterfaces.arxml</ARXML>
+	</FILEREF>
+	<FILEREF>
+		<ARXML>ComponentTypes/ErrorHandler.arxml</ARXML>
+		<DVG>ComponentTypes/ErrorHandler.dvg</DVG>
+	</FILEREF>
+	<FILEREF>
+		<ARXML>ComponentTypes/LightCtrl.arxml</ARXML>
+		<DVG>ComponentTypes/LightCtrl.dvg</DVG>
+	</FILEREF>
+	<FILEREF>
+		<ARXML>ECUProjects/LightControl.arxml</ARXML>
+		<DVG>ECUProjects/LightControl.dvg</DVG>
+	</FILEREF>
+</DCF>

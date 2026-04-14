@@ -1,0 +1,10 @@
+version: 2.0.0
+
+test-unit-implementation:
+  - source-file-path: SoftwareTest.vtesttree.yaml
+  - source-file-path: CAPL_ThresholdTests.can
+  - source-file-path: CAPL_SimpleTests.can
+  - source-file-path: CAPL_AutoTests.can
+  - source-file-path: CAPL_NegativeTests.can
+
+

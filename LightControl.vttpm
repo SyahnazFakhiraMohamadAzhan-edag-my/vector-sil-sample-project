@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<VttPortMonitoring>
+  <PortHook>
+    <Ecu>BFC</Ecu>
+    <Port>ECU_Composition/LightCtrl/Error</Port>
+	<CanoeRepresentation>DistributedObject</CanoeRepresentation>
+  </PortHook>
+</VttPortMonitoring>

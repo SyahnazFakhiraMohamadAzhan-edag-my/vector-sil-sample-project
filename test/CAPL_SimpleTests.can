@@ -1,0 +1,111 @@
+/*@!Encoding:65001*/
+includes
+{
+  #include "CAPL_TestingFunctions.cin"
+}
+
+variables
+{
+  // Initialize all mandatory variables. Avoid initialization of variables in functions.
+  const int cHystOnDelay = 2000;  // Hysteresis time when switching on
+  const int cHystOffDelay = 3000; // Hysteresis time when switching off
+  const int cEpsilon = 100;       // cycleTime
+
+  // Initialization of helper and placeholder variables
+  long ret;
+  struct TestSetup
+  {
+    int initialLightIntensity;    // Light intensity before test start
+    int testLightIntensity;       // Light intensity during test
+    int initialLightSwitchState;  // Switch position before test start
+    int testLightSwitchState;     // Switch position during test
+    int initialHeadlightState;    // Headlight state before test start
+    int testHeadLightState;       // Planned/Expected headlight state during test
+  };
+  
+  struct TestSetup SimpleTests_TS_OffToOn= {0, 0, 0, 1, 0, 1};
+  struct TestSetup SimpleTests_TS_OnToOff= {0, 0, 1, 0, 1, 0};
+
+
+  char msgBuff [200];
+}
+
+// Testcase: Prepare VTT ECU
+export testcase Prepare(){
+  Initialize();
+  testValidateImplValueUInt("Validate EcuM State", LightControl_DO::BFC.EcuM.State, 48);
+  testValidateImplValueUInt("Validate Controller State", LightControl_DO::BFC.Controller.State, 4);
+}
+
+// Testcase: Switch From OFF To ON In Darkness
+export testcase OffToOn_Darkness(){
+  // Test setup and assurance
+  testStep(1, "1.0", "Test setup: Switch from OFF to ON in darkness. Expecting headlight and lightswitch to be OFF.");
+  
+  sysSetVariableInt(sysvar::Interface::LightIntensity, SimpleTests_TS_OffToOn.initialLightIntensity);
+  ret = setupAndValidate(SimpleTests_TS_OffToOn.initialLightSwitchState, SimpleTests_TS_OffToOn.initialHeadlightState, cEpsilon, cEpsilon);
+  if (ret != 0){
+    testStepFail(1, "1.0", "Setup of test could not be achieved.");
+    return;
+  }
+  testStepPass(1, "1.0", "Setup of test was achieved.");
+  
+  // Start testing
+  // Set switch to ON
+  testStep(0,"2.0", "Test: Switch from OFF to ON in darkness.");
+  ret = setupAndValidate(SimpleTests_TS_OffToOn.testLightSwitchState, SimpleTests_TS_OffToOn.testHeadLightState, cEpsilon, cEpsilon);
+  if (ret == 1){
+    testStepFail(1, "2.0", "Test failed because lightswitch couldn't be set correctly.");
+    return;
+  }
+  if (ret == 2) {
+    testStepFail(1, "2.0", "Test failed because headlight didn't turn on.");
+    return;
+  }
+  testStepPass(1, "2.0", "Start of test succeeded. Lightswitch on ON, headlight is ON.");
+  
+  testStep(1, "3.0", "Hysteresis time test.");
+  
+  ret = testWaitForChange(LightControl_DO::BFC.LightCtrl.Output.HeadLight, cHystOnDelay);
+  if (ret != 0){
+    testStepFail(1, "3.0", "Headlights turned off or error occured in hysteresis time.");
+    return;
+  }
+  testStepPass(1, "3.0", "Headlights stayed on for hysteresis time.");
+}
+
+// Testcase: Switch From ON To OFF In Darkness
+export testcase OnToOff_Darkness(){
+  // Test setup and assurance
+  testStep(1, "1.0", "Test setup: Switch from ON to OFF in darkness. Expecting lightswitch to be ON and headlight to be ON.");
+  sysSetVariableInt(sysvar::Interface::LightIntensity, SimpleTests_TS_OnToOff.initialLightIntensity);
+  ret = setupAndValidate(SimpleTests_TS_OnToOff.initialLightSwitchState, SimpleTests_TS_OnToOff.initialHeadlightState, cEpsilon, cEpsilon);
+  if (ret != 0){
+    testStepFail(1, "1.0", "Setup of test could not be achieved.");
+    return;
+  }
+  testStepPass(1, "1.0", "Setup of test was achieved.");
+  
+  // Start testing
+  // Set switch to ON
+  testStep(0, "2.0", "Test: Switch from ON to OFF in darkness.");
+  ret = setupAndValidate(SimpleTests_TS_OnToOff.testLightSwitchState, SimpleTests_TS_OnToOff.testHeadLightState, cEpsilon, cEpsilon);
+  if (ret == 1){
+    testStepFail(1, "2.0", "Test failed because lightswitch couldn't be set correctly.");
+    return;
+  }
+  if (ret == 2) {
+    testStepFail(1, "2.0", "Test failed because headlight didn't turn on.");
+    return;
+  }
+  testStepPass(1, "2.0", "Start of test succeeded. Lightswitch on ON, headlight is ON.");
+  
+  testStep(1, "3.0", "Hysteresis time test.");
+  
+  ret = testWaitForChange(LightControl_DO::BFC.LightCtrl.Output.HeadLight, cHystOffDelay);
+  if (ret != 0){
+    testStepFail(1, "3.0", "Headlights turned on or error occured in hysteresis time.");
+    return;
+  }
+  testStepPass(1, "3.0", "Headlights stayed off for hysteresis time.");
+}

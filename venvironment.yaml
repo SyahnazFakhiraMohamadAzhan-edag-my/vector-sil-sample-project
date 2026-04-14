@@ -1,0 +1,19 @@
+version: 4.0.0
+
+datasources:
+  - file-path: SUT/BFC.vCDL
+
+system-variables:
+  - file-path: system-variables/interface.vsysvar
+
+application-models:
+  - file-path: "SUT/BFC.vmodule"
+  - file-path: "application-models/bfc_capl.can"
+
+global-settings:
+  working-mode:
+    time-source: internal-scaled
+    time-scaling-factor: 1
+    default-network-mapping: internal-simulator
+  database:
+    use-application-layer-objects: []

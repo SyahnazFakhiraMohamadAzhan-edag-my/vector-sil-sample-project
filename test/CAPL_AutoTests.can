@@ -1,0 +1,243 @@
+/*@!Encoding:65001*/
+/*
+This file contains all testcases for the AUTO-Mode. This mode uses thresholds
+to automatically turn the headlight ON or OFF depending on the light conditions ("Lightintensity").
+*/
+includes
+{
+  #include "CAPL_TestingFunctions.cin"
+}
+
+variables
+{
+  // Initialize all mandatory variables. Avoid initialization of variables in functions.
+  const int cHystOnDelay = 2000;  // Hysteresis time when switching on
+  const int cHystOffDelay = 3000; // Hysteresis time when switching off
+  const int cEpsilon = 100;       // cycleTime
+
+  // Initialization of helper and placeholder variables
+  long ret;
+  struct TestSetup
+  {
+    int initialLightIntensity;    // Light intensity before test start
+    int testLightIntensity;       // Light intensity during test
+    int initialLightSwitchState;  // Switch position before test start
+    int testLightSwitchState;     // Switch position during test
+    int initialHeadlightState;    // Headlight state before test start
+    int testHeadLightState;       // Planned/Expected headlight state during test
+  };
+  
+  struct TestSetup AutoTests_TS_OffToAutoDark= {0, 0, 0, 2, 0, 1};
+  struct TestSetup AutoTests_TS_OffToAutoDay= {1000, 1000, 0, 2, 0, 0};
+  struct TestSetup AutoTests_TS_OnToAutoDay= {1000, 1000, 1, 2, 1, 0};
+  struct TestSetup AutoTests_TS_OnToAutoDark= {0, 0, 1, 2, 1, 1};
+  struct TestSetup AutoTests_TS_AutoRise= {0, 1000, 2, 2, 1, 0};
+  struct TestSetup AutoTests_TS_AutoDrop= {1000, 0, 2, 2, 0, 1};
+
+  char msgBuff [200];
+}
+
+// AUTO-Mode Testcase: Switch From OFF To AUTO-Lightcontrol In Darkness
+export testcase OffToAuto_Darkness(){
+  // Test setup and assurance
+  testStep(1, "1.0", "Test setup: Switch from OFF to AUTO in darkness.");
+  
+  sysSetVariableInt(sysvar::Interface::LightIntensity, AutoTests_TS_OffToAutoDark.initialLightIntensity);
+  ret = setupAndValidate(AutoTests_TS_OffToAutoDark.initialLightSwitchState, AutoTests_TS_OffToAutoDark.initialHeadlightState, cEpsilon, cEpsilon);
+  if (ret != 0){
+    testStepFail(1, "1.0", "Setup of test could not be achieved.");
+    return;
+  }
+  testStepPass(1, "1.0", "Setup of test was achieved.");
+  
+  // Start testing
+  // Set switch to AUTO
+  testStep(1, "2.0", "Test: Switching from OFF to AUTO in darkness.");
+  ret = setupAndValidate(AutoTests_TS_OffToAutoDark.testLightSwitchState, AutoTests_TS_OffToAutoDark.testHeadLightState, cEpsilon, cEpsilon);
+  
+  if (ret == 1){
+    testStepFail(1, "2.0", "Test failed because lightswitch couldn't be set correctly.");
+    return;
+  }
+  if (ret == 2) {
+    testStepFail(1, "2.0", "Test failed because headlight didn't turn on.");
+    return;
+  }
+  testStepPass(1, "2.0", "Start of test succeeded. Lightswitch on AUTO, headlight is ON.");
+  
+  testStep(1, "3.0", "Hysteresis time test.");
+  ret = testWaitForChange(LightControl_DO::BFC.LightCtrl.Output.HeadLight, cHystOnDelay);
+  if (ret != 0){
+    testStepFail(1, "3.0", "Headlight state changed in hysteresis time.");
+    return;
+  }
+  testStepPass(1, "3.0", "Headlight state didn't change in hysteresis time.");
+}
+
+// AUTO-Mode Testcase: Light Should Stay Off When Switching To AUTO In Daylight
+export testcase OffToAuto_Daylight(){
+  // Test setup and assurance
+  testStep(1, "1.0", "Test setup: Light should stay off when switching to AUTO in daylight.");
+  sysSetVariableInt(sysvar::Interface::LightIntensity, AutoTests_TS_OffToAutoDay.initialLightIntensity); // Set lightintensity to maximum (100%)
+  
+  ret = setupAndValidate(AutoTests_TS_OffToAutoDay.initialLightSwitchState, AutoTests_TS_OffToAutoDay.initialHeadlightState, cEpsilon, cEpsilon);
+  if (ret != 0){
+    testStepFail(1, "1.0", "Setup of test could not be achieved.");
+    return;
+  }
+  testStepPass(1, "1.0", "Setup of test was achieved.");
+  
+  // Start testing
+  testStep(0, "2.0", "Test: Switching from OFF to AUTO in daylight. Light should stay OFF.");
+  ret = setupAndValidate(AutoTests_TS_OffToAutoDay.testLightSwitchState, AutoTests_TS_OffToAutoDay.testHeadLightState, cEpsilon, cEpsilon);
+  
+  if (ret == 1){
+    testStepFail(1, "2.0", "Test failed because lightswitch couldn't be set correctly.");
+    return;
+  }
+  if (ret == 2) {
+    testStepFail(1, "2.0", "Test failed because headlight did turn on.");
+    return;
+  }
+  testStepPass(1, "2.0", "Start of test succeeded. Lightswitch on AUTO, headlight is OFF.");
+  
+  testStep(1, "3.0", "Hysteresis time test.");
+  
+  ret = testWaitForChange(LightControl_DO::BFC.LightCtrl.Output.HeadLight,cHystOffDelay);
+  if (ret != 0){
+    testStepFail(1, "3.0", "Headlights turned on or error occured in hysteresis time.");
+    return;
+  }
+  testStepPass(1, "3.0", "Headlights stayed off for hysteresis time.");
+}
+
+// AUTO-Mode Testcase: Light Should Turn OFF When Switching To AUTO In Daylight
+export testcase OnToAuto_Daylight(){
+  // Test setup and assurance
+  testStep(0, "1.0", "Test Setup: Light should turn OFF when switching to AUTO in daylight.");
+  sysSetVariableInt(sysvar::Interface::LightIntensity, AutoTests_TS_OnToAutoDay.initialLightIntensity); 
+  ret = setupAndValidate(AutoTests_TS_OnToAutoDay.initialLightSwitchState, AutoTests_TS_OnToAutoDay.initialHeadlightState, cEpsilon, cEpsilon);
+  if (ret != 0){
+    testStepFail(1, "1.0", "Setup of test could not be achieved.");
+    return;
+  }
+  testStepPass(1, "1.0", "Succesfully setup test.");
+  
+  // Start testing
+  testStep(1,"2.0", "Test: Switching from ON to AUTO in daylight. Light should turn OFF.");
+    
+  ret = setupAndValidate(AutoTests_TS_OnToAutoDay.testLightSwitchState, AutoTests_TS_OnToAutoDay.testHeadLightState, cEpsilon, cEpsilon);
+  
+  if (ret == 1){
+    testStepFail(1, "2.0", "Test failed because lightswitch couldn't be set correctly.");
+    return;
+  }
+  if (ret == 2) {
+    testStepFail(1, "2.0", "Test failed because headlight didn't turn off.");
+    return;
+  }
+  testStepPass(1, "2.0", "Start of test succeeded. Lightswitch on AUTO, headlight is off.");
+  
+  testStep(1, "3.0", "Hysteresis time test.");
+  
+  ret = testWaitForChange(LightControl_DO::BFC.LightCtrl.Output.HeadLight, cHystOffDelay);
+  if (ret != 0){
+    testStepFail(1, "3.0", "Headlight state changed in hysteresis time.");
+    return;
+  }
+  testStepPass(1, "3.0", "Headlight state didn't change in hysteresis time.");
+}
+
+
+// AUTO-Mode Testcase: Light Should Turn On After Hysteresis Time When Switchting To Auto In Darkness 
+export testcase OnToAuto_Darkness(){
+  // Test setup and assurance
+  testStep(0, "1.0", "Test setup: Light should turn on after hysteresis time when switching to AUTO in darkness.");
+  sysSetVariableInt(sysvar::Interface::LightIntensity, AutoTests_TS_OnToAutoDark.initialLightIntensity);
+  ret = setupAndValidate(AutoTests_TS_OnToAutoDark.initialLightSwitchState, AutoTests_TS_OnToAutoDark.initialHeadlightState, cEpsilon, cEpsilon);
+  if (ret != 0){
+    testStepFail(1, "1.0", "Setup of test could not be achieved.");
+    return;
+  }
+  testStepPass(1, "1.0", "Setup of test was achieved.");
+  
+  // Start testing
+  testStep(0, "2.0", "Test: Light should stay on after hysteresis when switching from ON to AUTO in darkness.");
+  
+  ret = setupAndValidate(AutoTests_TS_OnToAutoDark.testLightSwitchState, AutoTests_TS_OnToAutoDark.testHeadLightState, cEpsilon, cEpsilon);
+  
+  if (ret == 1){
+    testStepFail(1, "2.0", "Test failed because lightswitch couldn't be set correctly.");
+    return;
+  }
+  if (ret == 2) {
+    testStepFail(1, "2.0", "Test failed because headlight didn't turn on.");
+    return;
+  }
+  testStepPass(1, "2.0", "Start of test succeeded. Lightswitch on AUTO, headlight is on.");
+  
+  testStep(1, "3.0", "Hysteresis time test.");
+  ret = testWaitForChange(LightControl_DO::BFC.LightCtrl.Output.HeadLight, cHystOnDelay);
+  if (ret == 1){
+    testStepFail(0, "3.0", "Headlights turned off.");
+    return;
+  }
+  testStepPass(0, "3.0", "Headlight stayed on long enough after switch change in darkness.");
+}
+
+// AUTO-Mode testcase: Light Should Turn OFF After Hysteresis Time When Lightintensity Rises Over Threshold
+export testcase AUTO_LightIntensityRise(){
+  // Test setup and assurance
+  testStep(0, "1.0", "Test setup: Light should turn OFF after hysteresis time when lightintensity rises over threshold.");
+  sysSetVariableInt(sysvar::Interface::LightIntensity, AutoTests_TS_AutoRise.initialLightIntensity);
+  ret = setupAndValidate(AutoTests_TS_AutoRise.initialLightSwitchState, AutoTests_TS_AutoRise.initialHeadlightState, cEpsilon, cEpsilon);
+  if (ret != 0){
+    testStepFail(1, "1.0", "Setup of test could not be achieved.");
+    return;
+  }
+  testStepPass(1, "1.0", "Setup of test was achieved.");
+  
+  // Start testing
+  testStep(0, "2.0", "Test: Light should not turn off for hysteresis time after lightintensity rise.");
+  sysSetVariableInt(sysvar::Interface::LightIntensity, AutoTests_TS_AutoRise.testLightIntensity);
+  
+  ret = testWaitForChange(LightControl_DO::BFC.LightCtrl.Output.HeadLight, cHystOffDelay);
+  
+  if (ret != 0){
+    testStepFail(1, "2.0", "Test failed because headlight state changed in hysteresis time or error occurred.");
+    return;
+  }
+  testStepPass(1, "2.0", "Start of test succeeded. Headlight stayed on.");
+  
+  testStep(1, "3.0", "Test: Reaction test. Expecting light to turn off.");
+  ret = waitForHeadlightState(AutoTests_TS_AutoRise.testHeadlightState, cEpsilon);
+  if (ret != 1){
+    testStepFail(0,"3.0", "Headlights did not turn off.");
+    return;
+  }
+  testStepPass(0, "3.0", "Headlight turned off after correct time.");
+}
+
+// AUTO-Mode Testcase: Light Should Turn ON In Hysteresis Time When Lightintensity Drops Under Threshold 
+export testcase AUTO_LightIntensityDrop(){
+  // Test setup and assurance
+  testStep(0, "1.0", "Test setup: Light should turn ON in hysteresis time when lightintensity drops under threshold.");
+  sysSetVariableInt(sysvar::Interface::LightIntensity, AutoTests_TS_AutoDrop.initialLightIntensity);
+  ret = setupAndValidate(AutoTests_TS_AutoDrop.initialLightSwitchState, AutoTests_TS_AutoDrop.initialHeadlightState, cEpsilon, cEpsilon);
+  if (ret != 0){
+    testStepFail(1, "1.0", "Setup of test could not be achieved.");
+    return;
+  }
+  testStepPass(1, "1.0", "Setup of test was achieved.");
+  
+  // Start testing
+  testStep(0, "2.0", "Test: Light should turn on in hysteresis time after lightintensity drop.");
+  sysSetVariableInt(sysvar::Interface::LightIntensity, AutoTests_TS_AutoDrop.testLightIntensity);
+  testWaitForTimeout(cEpsilon); // Cycle time and hysteresis variation
+  ret = waitForHeadlightState(AutoTests_TS_AutoDrop.testHeadlightState, cHystOnDelay);
+  if (ret != 1){
+    testStepFail(0, "2.0", "Headlights did not turn on or error occurred.");
+    return;
+  }
+  testStepPass(0, "2.0", "Headlight turned on instantly.");
+}

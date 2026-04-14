@@ -1,0 +1,12 @@
+version: 2.0.0
+test-tree:
+    - capl-test-case: Prepare
+    - capl-test-case: OffToOn_Darkness
+    - capl-test-case: OnToOff_Darkness
+    - capl-test-case: OffToAuto_Darkness
+    - capl-test-case: AUTO_LightIntensityRise
+    - capl-test-case: AUTO_LightIntensityDrop
+    - capl-test-case: Threshold_AUTO_LightIntensityRise
+    - capl-test-case: Threshold_AUTO_LightIntensityDrop
+    - capl-test-case: InvalidThresholdChange
+    - capl-test-case: OnToInvalid_Darkness
