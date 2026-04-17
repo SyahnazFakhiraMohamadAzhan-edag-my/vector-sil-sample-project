@@ -86,8 +86,16 @@ jobs:
         id: canoese
         shell: powershell
         run: |
-          & canoe-se ./compiled-environment-and-tests/Default.venvironment -d ./simulation --test-unit ./compiled-environment-and-tests/SoftwareTest.vtestunit
+          $envPath = Get-ChildItem -Path . -Recurse -Filter 'Default.venvironment' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $envPath) { Write-Error "Default.venvironment not found after artifact download"; exit 1 }
+          $tuPath = Get-ChildItem -Path . -Recurse -Filter 'SoftwareTest.vtestunit' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $tuPath) { Write-Error "SoftwareTest.vtestunit not found after artifact download"; exit 1 }
+          New-Item -ItemType Directory -Force -Path ./simulation | Out-Null
+          Write-Host "Using environment: $envPath"
+          Write-Host "Using test unit: $tuPath"
+          & canoe-se "$envPath" -d ./simulation --test-unit "$tuPath"
           Write-Host "CANoe Server Edition returned exit code $LASTEXITCODE"
+          exit $LASTEXITCODE
 
       - name: Export test reports
         if: ${{ !cancelled() }}
