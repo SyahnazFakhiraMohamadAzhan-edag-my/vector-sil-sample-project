@@ -1,0 +1,133 @@
+name: Sil-Testing
+
+on:
+  pull_request:
+
+permissions:
+  checks: write
+  contents: read
+
+jobs:
+  # Job to build the System Under Test (SUT)
+  build-sut:
+    name: Build SUT
+    runs-on: vtt
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build SUT with VttMake
+        shell: pwsh
+        run: |
+          VttMake make ./LightControl_MinGW.vttmake
+          if(-Not $?) { Write-Host "VttMake failed." -ForegroundColor red; exit 1 }
+
+      - name: List built DLLs
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Filter *.dll | Select-Object -First 50 | ForEach-Object { Write-Host $_.FullName }
+
+  # Job to build the simulation environment and compile test units
+  build-simulation:
+    name: Build simulation
+    # needs: [build-sut]  # temporarily disabled: build-sut job commented out
+    runs-on: canoe-small
+    steps:
+      # check out the repository containing the codebase
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # download the SUT artifact produced by the build-sut job (temporarily disabled)
+      # - name: Fetch SUT artifact
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: SUT
+      #     path: ECU/SUT
+
+      # create the simulation environment from the venvironment.yaml file
+      - name: Make environment
+        run: |
+            environment-make . -o ./compiled-environment-and-tests;
+
+      # compile the test units for the environment
+      - name: Make test units
+        run: |
+            test-unit-make ./test/SoftwareTest.vtestunit.yaml -e ./compiled-environment-and-tests/Default.venvironment -o ./compiled-environment-and-tests/;
+
+      # upload the compiled environment and test units as an artifact
+      - name: Export compiled-environment-and-tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-environment-and-tests
+          path: ./compiled-environment-and-tests/
+          retention-days: 7
+
+  # Job to run the simulation tests
+  run-tests-simulation:
+    name: Run simulation
+    if: false  # temporarily disabled: requires SUT artifact
+    needs: build-simulation
+    runs-on: canoe-large
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch compiled-environment-and-tests artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: compiled-environment-and-tests
+          path: compiled-environment-and-tests
+
+      - name: Run CANoe Server Edition
+        id: canoese
+        run: |
+          & canoe-se ./compiled-environment-and-tests/Default.venvironment -d ./simulation --test-unit ./compiled-environment-and-tests/SoftwareTest.vtestunit
+          Write-Host "CANoe Server Edition returned exit code $LASTEXITCODE"
+
+      - name: Export test reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Test Reports
+          path: |
+            ./simulation/TestReports/
+          retention-days: 7
+
+      - name: Upload log files
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: Log Files
+          path: ./simulation/*.txt
+
+  # Job to display the test report
+  display-test-report:
+    name: Display test report
+    if: false  # temporarily disabled: requires SUT/results
+    needs: run-tests-simulation
+    runs-on: canoe-small
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch test report artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Test Reports
+          path: ./simulation/TestReports/
+
+      - name: Convert all test reports to XUnit format
+        working-directory: ./simulation/TestReports/
+        run: |
+          get-childitem . -Filter *.vtestreport | foreach {
+            ReportViewerCli -r $_ -xu
+          }
+
+      - name: Display test results
+        uses: dorny/test-reporter@v1.9.1
+        with:
+          name: Test results
+          path: "./simulation/TestReports/*_xunit.xml"
+          reporter: java-junit
+          fail-on-error: 'false'
+
