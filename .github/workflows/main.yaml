@@ -71,19 +71,17 @@ jobs:
   # Job to run the simulation tests
   run-tests-simulation:
     name: Run simulation
-    if: false  # temporarily disabled: requires SUT artifact
     needs: build-simulation
     runs-on: canoe-large
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Fetch compiled-environment-and-tests artifact
+      - name: Fetch SUT artifact
         uses: actions/download-artifact@v4
         with:
-          name: compiled-environment-and-tests
-          path: compiled-environment-and-tests
-
+          name: SUT
+          path: SUT
       - name: Run CANoe Server Edition
         id: canoese
         shell: powershell
@@ -110,7 +108,6 @@ jobs:
   # Job to display the test report
   display-test-report:
     name: Display test report
-    if: false  # temporarily disabled: requires SUT/results
     needs: run-tests-simulation
     runs-on: canoe-small
     steps:
