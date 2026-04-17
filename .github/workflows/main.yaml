@@ -30,7 +30,7 @@ jobs:
           retention-days: 7
 
       - name: List built DLLs
-        shell: pwsh
+        shell: powershell
         run: |
           Get-ChildItem -Recurse -Filter *.dll | Select-Object -First 50 | ForEach-Object { Write-Host $_.FullName }
 
@@ -50,15 +50,15 @@ jobs:
           name: SUT
           path: SUT
 
-      # create the simulation environment from the venvironment.yaml file
       - name: Make environment
+        shell: powershell
         run: |
-            environment-make . -o ./compiled-environment-and-tests;
+            environment-make . -o ./compiled-environment-and-tests
 
-      # compile the test units for the environment
       - name: Make test units
+        shell: powershell
         run: |
-            test-unit-make ./test/SoftwareTest.vtestunit.yaml -e ./compiled-environment-and-tests/Default.venvironment -o ./compiled-environment-and-tests/;
+            test-unit-make ./test/SoftwareTest.vtestunit.yaml -e ./compiled-environment-and-tests/Default.venvironment -o ./compiled-environment-and-tests/
 
       # upload the compiled environment and test units as an artifact
       - name: Export compiled-environment-and-tests
@@ -86,6 +86,7 @@ jobs:
 
       - name: Run CANoe Server Edition
         id: canoese
+        shell: powershell
         run: |
           & canoe-se ./compiled-environment-and-tests/Default.venvironment -d ./simulation --test-unit ./compiled-environment-and-tests/SoftwareTest.vtestunit
           Write-Host "CANoe Server Edition returned exit code $LASTEXITCODE"
@@ -124,6 +125,7 @@ jobs:
 
       - name: Convert all test reports to XUnit format
         working-directory: ./simulation/TestReports/
+        shell: powershell
         run: |
           get-childitem . -Filter *.vtestreport | foreach {
             ReportViewerCli -r $_ -xu
