@@ -22,6 +22,13 @@ jobs:
           VttMake make ./LightControl_MinGW.vttmake
           if(-Not $?) { Write-Host "VttMake failed." -ForegroundColor red; exit 1 }
 
+      - name: Upload SUT artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SUT
+          path: ./SUT
+          retention-days: 7
+
       - name: List built DLLs
         shell: pwsh
         run: |
@@ -30,19 +37,18 @@ jobs:
   # Job to build the simulation environment and compile test units
   build-simulation:
     name: Build simulation
-    # needs: [build-sut]  # temporarily disabled: build-sut job commented out
+    needs: [build-sut]
     runs-on: canoe-small
     steps:
       # check out the repository containing the codebase
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # download the SUT artifact produced by the build-sut job (temporarily disabled)
-      # - name: Fetch SUT artifact
-      #   uses: actions/download-artifact@v4
-      #   with:
-      #     name: SUT
-      #     path: ECU/SUT
+      - name: Fetch SUT artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: SUT
+          path: SUT
 
       # create the simulation environment from the venvironment.yaml file
       - name: Make environment
