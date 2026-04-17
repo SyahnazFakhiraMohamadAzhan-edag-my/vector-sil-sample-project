@@ -116,6 +116,8 @@ typedef struct tag_DW_LightCtrl_SWC_T {
 #define LightCtrl_SWC_IN_OnMode        ((uint8)3U)
 #define LightCtrl_SW_IN_NO_ACTIVE_CHILD ((uint8)0U)
 
+#define TestCICD ((uint8)0U)
+
 /* Block states (auto storage) */
 DW_LightCtrl_SWC_T LightCtrl_SWC_DW;
 
