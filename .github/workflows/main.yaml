@@ -82,6 +82,13 @@ jobs:
         with:
           name: SUT
           path: SUT
+
+      - name: Fetch compiled-environment-and-tests artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: compiled-environment-and-tests
+          path: compiled-environment-and-tests
+
       - name: Run CANoe Server Edition
         id: canoese
         shell: powershell
