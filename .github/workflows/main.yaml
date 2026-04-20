@@ -135,7 +135,7 @@ jobs:
           name: Test Reports
           path: ./simulation/TestReports/
 
-            - name: Convert all test reports to XUnit format
+      - name: Convert all test reports to XUnit format
         working-directory: ./simulation/TestReports/
         shell: powershell
         run: |
