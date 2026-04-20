@@ -135,13 +135,21 @@ jobs:
           name: Test Reports
           path: ./simulation/TestReports/
 
-      - name: Convert all test reports to XUnit format
+            - name: Convert all test reports to XUnit format
         working-directory: ./simulation/TestReports/
         shell: powershell
         run: |
           get-childitem . -Filter *.vtestreport | foreach {
             ReportViewerCli -r $_ -xu
           }
+
+      - name: Upload XUnit XML
+        uses: actions/upload-artifact@v4
+        with:
+          name: xunit-xml
+          path: ./simulation/TestReports/*_xunit.xml
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Display test results
         uses: dorny/test-reporter@v1.9.1
@@ -150,4 +158,5 @@ jobs:
           path: "./simulation/TestReports/*_xunit.xml"
           reporter: java-junit
           fail-on-error: 'false'
+
 
