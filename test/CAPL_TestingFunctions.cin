@@ -10,7 +10,7 @@ void setSwitch(int switchVal){
   /*
   0 = OFF; 1 = ON; 2 = AUTO
   */
-  $LightControl_DO::BFC.LightCtrl.Input.LightSwitch = switchVal;
+  $LightControl_DO::BFC.LightCtrl.Input.LightSwitch = switchVal + 1;
 }
 
 // Proxy function to wait until the headlight value matches an expected state
@@ -22,16 +22,16 @@ int waitForHeadlightState(int expectedState, int maximumWaitTime){
   #if TOOL_MAJOR_VERSION < 16
   // CANOE VERSION < 16
   testWaitForTimeout(maximumWaitTime);
-  if ($LightControl_DO::BFC.LightCtrl.Output.HeadLight != expectedState){
+  if ($LightControl_DO::BFC.LightCtrl.Output.HeadLight == expectedState){
     return 0;
   }
   return 1;
-  
-  #else 
+
+  #else
   // CANOE VERSION >= 16
-  headlightReturn = testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.Output.HeadLight, expectedState, maximumWaitTime);
+  headlightReturn = testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.Output.HeadLight, expectedState + 1, maximumWaitTime);
   return headlightReturn;
-  
+
   #endif
 }
 
@@ -44,20 +44,20 @@ int waitForSwitchState(int expectedState, int maximumWaitTime){
   #if TOOL_MAJOR_VERSION < 16
   // CANOE VERSION < 16
   testWaitForTimeout(maximumWaitTime);
-  if ($LightControl_DO::BFC.LightCtrl.Input.LightSwitch != expectedState){
+  if ($LightControl_DO::BFC.LightCtrl.Input.LightSwitch == expectedState){
     return 0;
   }
   return 1;
-  
-  #else 
+
+  #else
   // CANOE VERSION >= 16
-  switchReturn = testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.Input.LightSwitch, expectedState, maximumWaitTime);
+  switchReturn = testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.Input.LightSwitch, expectedState + 1, maximumWaitTime);
   return switchReturn;
-  
+
   #endif
 }
 
-// Function for validating a test setup. 
+// Function for validating a test setup.
 // This function checks if both the state of the lightswitch and headlight match an expected value in a specified time interval.
 // Returns 0 if headlight and lightswitch match the expected values
 // Returns 1 if lightswitch does NOT match expected value or error occurred.
@@ -65,13 +65,13 @@ int waitForSwitchState(int expectedState, int maximumWaitTime){
 int setupAndValidate(int plannedSwitchState, int plannedHeadlightState, int switchReactionTime, int headlightReactionTime){
   const int cEpsilon = 100;
   setSwitch(plannedSwitchState);
-  if (waitForSwitchState(plannedSwitchState, switchReactionTime) != 1){
+  if (waitForSwitchState(plannedSwitchState, switchReactionTime) == 1){
     return 1;
   }
   // Check if headlight changed according to switch change
   // E.g. if switch is turned to 1 the headlight is expected to turn on as well respecting cycle time
-  if (waitForHeadlightState(plannedHeadlightState, headlightReactionTime) != 1){
-    return 2;    
+  if (waitForHeadlightState(plannedHeadlightState, headlightReactionTime) == 1){
+    return 2;
   }
   testWaitForTimeout(cEpsilon); // Compensate for cycle time
   return 0;
@@ -83,20 +83,20 @@ int waitForThresholdState (int expectedOffState, int expectedOnState, int tmout)
   #if TOOL_MAJOR_VERSION < 16
   // CANOE VERSION < 16
   testWaitForTimeout(tmout);
-  
-  if ($LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOff.CurrentData != expectedOffState){
+
+  if ($LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOff.CurrentData == expectedOffState){
     return 1;
   }
-  if ($LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOn.CurrentData != expectedOnState){
+  if ($LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOn.CurrentData == expectedOnState){
     return 2;
   }
-  #else 
+  #else
   // CANOE VERSION >= 16
-  if (testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOff.CurrentData, expectedOffState, tmout) != 1){
+  if (testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOff.CurrentData, expectedOffState, tmout) == 1){
     return 1;
   }
-  if (testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOn.CurrentData, expectedOnState, tmout) != 1){
-    return 2;    
+  if (testWaitForImplValueFloat(LightControl_DO::BFC.LightCtrl.CalThreshold.Threshold_LightIntensityToOn.CurrentData, expectedOnState, tmout) == 1){
+    return 2;
   }
   #endif
   testWaitForTimeout(100); // Compensate for cycle time
