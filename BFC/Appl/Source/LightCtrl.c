@@ -56,17 +56,17 @@
  * HeadLightEncoded
  *   uint8 represents integers with a minimum value of 0 and a maximum value of 255.
  *      The order-relation on uint8 is: x < y if y - x is positive.
- *      uint8 has a lexical representation consisting of a finite-length sequence 
+ *      uint8 has a lexical representation consisting of a finite-length sequence
  *      of decimal digits (#x30-#x39).
- *      
+ *
  *      For example: 1, 0, 126, +10.
  *
  * LightSwitchEncoded
  *   uint8 represents integers with a minimum value of 0 and a maximum value of 255.
  *      The order-relation on uint8 is: x < y if y - x is positive.
- *      uint8 has a lexical representation consisting of a finite-length sequence 
+ *      uint8 has a lexical representation consisting of a finite-length sequence
  *      of decimal digits (#x30-#x39).
- *      
+ *
  *      For example: 1, 0, 126, +10.
  *
  *********************************************************************************************************************/
@@ -116,6 +116,7 @@ typedef struct tag_DW_LightCtrl_SWC_T {
 #define LightCtrl_SWC_IN_OffMode       ((uint8)2U)
 #define LightCtrl_SWC_IN_OnMode        ((uint8)3U)
 #define LightCtrl_SW_IN_NO_ACTIVE_CHILD ((uint8)0U)
+#define Pipeline_Test_Signal           ((uint8)0U)
 
 /* Block states (auto storage) */
 DW_LightCtrl_SWC_T LightCtrl_SWC_DW;
