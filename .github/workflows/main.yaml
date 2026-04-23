@@ -143,17 +143,12 @@ jobs:
             ReportViewerCli -r $_ -xu
           }
 
-      - name: Set up Python (for junit2html)
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
 
       - name: Create HTML reports and XSL-styled copies
         working-directory: ./simulation/TestReports/
         shell: powershell
         run: |
-          python -m pip install --upgrade pip junit2html
-          # Write minimal XSL stylesheet to render XML as HTML when opened with the XSL next to it
+          # Write minimal XSL stylesheet to render XML as HTML when opened or transformed
           $xsl = @"
           <?xml version="1.0" encoding="UTF-8"?>
           <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
@@ -208,11 +203,16 @@ jobs:
           "@
           Set-Content -Path "junit-report.xsl" -Value $xsl -Encoding UTF8
 
+          # Convert each *_xunit.xml to a standalone HTML file using .NET XSLT (no Python required)
           Get-ChildItem -Filter "*_xunit.xml" | ForEach-Object {
             $in = $_.FullName
             $outHtml = [System.IO.Path]::ChangeExtension($in, ".html")
-            python -m junit2html $in $outHtml
+            $xslPath = Join-Path $_.DirectoryName "junit-report.xsl"
+            $xslt = New-Object System.Xml.Xsl.XslCompiledTransform
+            $xslt.Load($xslPath)
+            $xslt.Transform($in, $outHtml)
 
+            # Create styled XML copy that references the stylesheet
             $styled = $in -replace '\.xml$', '_styled.xml'
             $xml = Get-Content $in -Raw
             if ($xml -match '^\s*<\?xml.*\?>') {
@@ -222,6 +222,7 @@ jobs:
             }
             Set-Content -Path $styled -Value $xml -Encoding UTF8
           }
+
 
       - name: Upload XUnit XML
         uses: actions/upload-artifact@v4
