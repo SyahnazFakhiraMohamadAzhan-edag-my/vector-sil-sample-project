@@ -92,6 +92,7 @@ jobs:
       - name: Run CANoe Server Edition
         id: canoese
         shell: powershell
+        continue-on-error: true
         run: |
           $envPath = Get-ChildItem -Path . -Recurse -Filter 'Default.venvironment' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
           if (-not $envPath) { Write-Error "Default.venvironment not found after artifact download"; exit 1 }
@@ -101,11 +102,13 @@ jobs:
           Write-Host "Using environment: $envPath"
           Write-Host "Using test unit: $tuPath"
           & canoe-se "$envPath" -d ./simulation --test-unit "$tuPath"
-          Write-Host "CANoe Server Edition returned exit code $LASTEXITCODE"
-          exit $LASTEXITCODE
+          $code = $LASTEXITCODE
+          Write-Host "CANoe Server Edition returned exit code $code"
+          "exitcode=$code" >> $env:GITHUB_OUTPUT
+          exit 0
 
       - name: Export test reports
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: Test Reports
@@ -114,14 +117,22 @@ jobs:
           retention-days: 7
 
       - name: Upload log files
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: Log Files
           path: ./simulation/*.txt
 
+      - name: Finalize test status
+        if: ${{ steps.canoese.outputs.exitcode != '0' && !cancelled() }}
+        shell: powershell
+        run: |
+          Write-Host "Marking job as failed because CANoe exit code was ${{ steps.canoese.outputs.exitcode }}"
+          exit 1
+
     # Job to display the test report
   display-test-report:
+    if: ${{ always() }}
     name: Display test report
     needs: run-tests-simulation
     runs-on: canoe-small
@@ -129,7 +140,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Ensure report directory exists
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path ./simulation/TestReports | Out-Null
+
       - name: Fetch test report artifact
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: Test Reports
@@ -149,7 +166,7 @@ jobs:
         shell: powershell
         run: |
           # Write minimal XSL stylesheet to render XML as HTML when opened or transformed
-          $xsl = @"
+          $xsl = @'
           <?xml version="1.0" encoding="UTF-8"?>
           <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
             <xsl:output method="html" encoding="UTF-8" />
@@ -200,7 +217,7 @@ jobs:
               </html>
             </xsl:template>
           </xsl:stylesheet>
-          "@
+          '@
           Set-Content -Path "junit-report.xsl" -Value $xsl -Encoding UTF8
 
           # Convert each *_xunit.xml to a standalone HTML file using .NET XSLT (no Python required)
@@ -212,15 +229,19 @@ jobs:
             $xslt.Load($xslPath)
             $xslt.Transform($in, $outHtml)
 
-            # Create styled XML copy that references the stylesheet
+          # Create styled XML copy that references the stylesheet using XmlDocument
             $styled = $in -replace '\.xml$', '_styled.xml'
-            $xml = Get-Content $in -Raw
-            if ($xml -match '^\s*<\?xml.*\?>') {
-              $xml = $xml -replace '^\s*<\?xml.*\?>', "$0`r`n<?xml-stylesheet type=\"text/xsl\" href=\"junit-report.xsl\"?>"
+            $xmlText = Get-Content $in -Raw
+            $doc = New-Object System.Xml.XmlDocument
+            $doc.PreserveWhitespace = $true
+            $doc.LoadXml($xmlText)
+            $pi = $doc.CreateProcessingInstruction("xml-stylesheet", 'type="text/xsl" href="junit-report.xsl"')
+            if ($doc.FirstChild -and $doc.FirstChild.NodeType -eq [System.Xml.XmlNodeType]::XmlDeclaration) {
+              $doc.InsertAfter($pi, $doc.FirstChild)
             } else {
-              $xml = "<?xml-stylesheet type=\"text/xsl\" href=\"junit-report.xsl\"?>`r`n$xml"
+              $doc.InsertBefore($pi, $doc.DocumentElement)
             }
-            Set-Content -Path $styled -Value $xml -Encoding UTF8
+            $doc.Save($styled)
           }
 
 
@@ -245,6 +266,7 @@ jobs:
 
 
       - name: Display test results
+        if: ${{ always() }}
         uses: dorny/test-reporter@v1.9.1
         with:
           name: Test results
