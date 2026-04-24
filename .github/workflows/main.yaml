@@ -6,6 +6,8 @@ on:
 permissions:
   checks: write
   contents: read
+  pages: write
+  id-token: write
 
 jobs:
   # Job to build the System Under Test (SUT)
@@ -130,7 +132,7 @@ jobs:
           Write-Host "Marking job as failed because CANoe exit code was ${{ steps.canoese.outputs.exitcode }}"
           exit 1
 
-    # Job to display the test report
+  # Job to display the test report
   display-test-report:
     if: ${{ always() }}
     name: Display test report
@@ -159,7 +161,6 @@ jobs:
           get-childitem . -Filter *.vtestreport | foreach {
             ReportViewerCli -r $_ -xu
           }
-
 
       - name: Create HTML reports and XSL-styled copies
         working-directory: ./simulation/TestReports/
@@ -229,7 +230,7 @@ jobs:
             $xslt.Load($xslPath)
             $xslt.Transform($in, $outHtml)
 
-          # Create styled XML copy that references the stylesheet using XmlDocument
+            # Create styled XML copy that references the stylesheet using XmlDocument
             $styled = $in -replace '\.xml$', '_styled.xml'
             $xmlText = Get-Content $in -Raw
             $doc = New-Object System.Xml.XmlDocument
@@ -244,26 +245,17 @@ jobs:
             $doc.Save($styled)
           }
 
-
-      - name: Upload XUnit XML
+      - name: Upload test results bundle
         uses: actions/upload-artifact@v4
         with:
-          name: xunit-xml
-          path: ./simulation/TestReports/*_xunit.xml
-          if-no-files-found: warn
-          retention-days: 7
-
-      - name: Upload HTML & styled XML reports
-        uses: actions/upload-artifact@v4
-        with:
-          name: xunit-html
+          name: test-results-bundle
           path: |
+            ./simulation/TestReports/*_xunit.xml
             ./simulation/TestReports/*.html
             ./simulation/TestReports/*_styled.xml
             ./simulation/TestReports/junit-report.xsl
           if-no-files-found: warn
           retention-days: 7
-
 
       - name: Display test results
         if: ${{ always() }}
@@ -273,5 +265,62 @@ jobs:
           path: "./simulation/TestReports/*_xunit.xml"
           reporter: java-junit
           fail-on-error: 'false'
+
+  # Publish HTML report to GitHub Pages
+  publish-report:
+    if: ${{ always() }}
+    name: Publish HTML report to GitHub Pages
+    needs: display-test-report
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download report artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: test-results-bundle
+          path: site
+
+      - name: Create index.html
+        shell: bash
+        working-directory: site
+        run: |
+          set -e
+          shopt -s nullglob
+          HTMLS=( *.html )
+          cat > index.html << 'EOF'
+          <!doctype html>
+          <html><head>
+            <meta charset="utf-8" />
+            <title>Test Reports</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 1rem 2rem; }
+              a { text-decoration: none; }
+            </style>
+          </head><body>
+            <h1>Test Reports</h1>
+            <ul>
+          EOF
+          for f in "${HTMLS[@]}"; do
+            echo "<li><a href=\"$f\">$f</a></li>" >> index.html
+          done
+          cat >> index.html << 'EOF'
+            </ul>
+            <p>Raw files are also available in this folder (XML/XSL).</p>
+          </body></html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
 
