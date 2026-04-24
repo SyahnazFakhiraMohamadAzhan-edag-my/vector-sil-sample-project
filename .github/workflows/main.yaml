@@ -89,7 +89,7 @@ jobs:
           name: compiled-environment-and-tests
           path: compiled-environment-and-tests
 
-      - name: Run CANoe Server Edition
+            - name: Run CANoe Server Edition
         id: canoese
         shell: powershell
         continue-on-error: true
@@ -98,14 +98,20 @@ jobs:
           if (-not $envPath) { Write-Error "Default.venvironment not found after artifact download"; exit 1 }
           $tuPath = Get-ChildItem -Path . -Recurse -Filter 'SoftwareTest.vtestunit' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
           if (-not $tuPath) { Write-Error "SoftwareTest.vtestunit not found after artifact download"; exit 1 }
-          New-Item -ItemType Directory -Force -Path ./simulation | Out-Null
+          New-Item -ItemType Directory -Force -Path ./simulation/TestReports | Out-Null
+          $reportDir = Resolve-Path ./simulation/TestReports
+          $reportPath = Join-Path $reportDir "SoftwareTest.vtestreport"
+          $htmlPath = Join-Path $reportDir "SoftwareTest.html"
           Write-Host "Using environment: $envPath"
           Write-Host "Using test unit: $tuPath"
-          & canoe-se "$envPath" -d ./simulation --test-unit "$tuPath"
+          Write-Host "vTEST report will be written to: $reportPath"
+          Write-Host "HTML report will be written to: $htmlPath"
+          & canoe-se "$envPath" -d ./simulation --test-unit "$tuPath" -report "$reportPath" -exportTestReport HTML "$htmlPath"
           $code = $LASTEXITCODE
           Write-Host "CANoe Server Edition returned exit code $code"
           "exitcode=$code" >> $env:GITHUB_OUTPUT
           exit 0
+
 
       - name: Export test reports
         if: ${{ always() }}
@@ -160,59 +166,6 @@ jobs:
             ReportViewerCli -r $_ -xu
           }
 
-      - name: Export HTML reports from vtestreport
-        working-directory: ./simulation/TestReports/
-        shell: powershell
-        run: |
-          $ErrorActionPreference = 'Continue'
-
-          $reports = Get-ChildItem -Filter *.vtestreport
-          if (-not $reports) {
-            Write-Host "No .vtestreport files found to export to HTML."
-            exit 0
-          }
-
-          # Show CLI help (first lines) to the log to identify supported switches on the runner
-          try {
-            $help = & ReportViewerCli -? 2>&1 | Out-String
-            Write-Host "ReportViewerCli help (first 80 lines):"
-            $help -split "`n" | Select-Object -First 80 | ForEach-Object { Write-Host $_ }
-          } catch {}
-
-          $patterns = @(
-            { param($i,$o) & ReportViewerCli -r $i -html -o $o },
-            { param($i,$o) & ReportViewerCli -r $i -html },
-            { param($i,$o) & ReportViewerCli -r $i -e html -o $o },
-            { param($i,$o) & ReportViewerCli -r $i -export html -o $o },
-            { param($i,$o) & ReportViewerCli -r $i --export html -o $o },
-            { param($i,$o) & ReportViewerCli -r $i -f html -o $o },
-            { param($i,$o) & ReportViewerCli -r $i --format html -o $o },
-            { param($i,$o) & ReportViewerCli -r $i /html /o:$o }
-          )
-
-          foreach ($r in $reports) {
-            $in = $r.FullName
-            $out = [System.IO.Path]::ChangeExtension($in, ".html")
-            Remove-Item -Force -ErrorAction SilentlyContinue $out
-
-            Write-Host "Exporting HTML for $($r.Name)"
-
-            $exported = $false
-            foreach ($p in $patterns) {
-              try { & $p.Invoke($in,$out) | Out-Null } catch {}
-              if (Test-Path $out) { $exported = $true; break }
-            }
-
-            if ($exported) {
-              Write-Host "Created HTML: $out"
-            } else {
-              Write-Warning "Could not export HTML for $($r.Name). Please check the help above for the correct switch and let us know."
-            }
-          }
-
-          exit 0
-
-
       - name: Upload test results bundle
         uses: actions/upload-artifact@v4
         with:
@@ -224,7 +177,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-
       - name: Display test results
         if: ${{ always() }}
         uses: dorny/test-reporter@v1.9.1
@@ -233,6 +185,7 @@ jobs:
           path: "./simulation/TestReports/*_xunit.xml"
           reporter: java-junit
           fail-on-error: 'false'
+
 
 
 
