@@ -89,7 +89,7 @@ jobs:
           name: compiled-environment-and-tests
           path: compiled-environment-and-tests
 
-            - name: Run CANoe Server Edition
+      - name: Run CANoe Server Edition
         id: canoese
         shell: powershell
         continue-on-error: true
