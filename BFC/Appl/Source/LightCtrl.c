@@ -56,17 +56,17 @@
  * HeadLightEncoded
  *   uint8 represents integers with a minimum value of 0 and a maximum value of 255.
  *      The order-relation on uint8 is: x < y if y - x is positive.
- *      uint8 has a lexical representation consisting of a finite-length sequence 
+ *      uint8 has a lexical representation consisting of a finite-length sequence
  *      of decimal digits (#x30-#x39).
- *      
+ *
  *      For example: 1, 0, 126, +10.
  *
  * LightSwitchEncoded
  *   uint8 represents integers with a minimum value of 0 and a maximum value of 255.
  *      The order-relation on uint8 is: x < y if y - x is positive.
- *      uint8 has a lexical representation consisting of a finite-length sequence 
+ *      uint8 has a lexical representation consisting of a finite-length sequence
  *      of decimal digits (#x30-#x39).
- *      
+ *
  *      For example: 1, 0, 126, +10.
  *
  *********************************************************************************************************************/
