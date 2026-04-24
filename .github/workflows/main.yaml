@@ -17,10 +17,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build SUT with VttMake
-        shell: pwsh
+        shell: powershell
         run: |
-          VttMake make ./LightControl_MinGW.vttmake
-          if(-Not $?) { Write-Host "VttMake failed." -ForegroundColor red; exit 1 }
+          & "C:\Program Files\Vector vVIRTUALtarget 9\Exec64\VttMake.exe" make ./LightControl_MinGW.vttmake
+          if ($LASTEXITCODE -ne 0) { Write-Host "VttMake failed." -ForegroundColor Red; exit 1 }
 
       - name: Upload SUT artifact
         uses: actions/upload-artifact@v4
@@ -30,7 +30,7 @@ jobs:
           retention-days: 7
 
       - name: List built DLLs
-        shell: pwsh
+        shell: powershell
         run: |
           Get-ChildItem -Recurse -Filter *.dll | Select-Object -First 50 | ForEach-Object { Write-Host $_.FullName }
 
@@ -50,15 +50,15 @@ jobs:
           name: SUT
           path: SUT
 
-      # create the simulation environment from the venvironment.yaml file
       - name: Make environment
+        shell: powershell
         run: |
-            environment-make . -o ./compiled-environment-and-tests;
+            environment-make . -o ./compiled-environment-and-tests
 
-      # compile the test units for the environment
       - name: Make test units
+        shell: powershell
         run: |
-            test-unit-make ./test/SoftwareTest.vtestunit.yaml -e ./compiled-environment-and-tests/Default.venvironment -o ./compiled-environment-and-tests/;
+            test-unit-make ./test/SoftwareTest.vtestunit.yaml -e ./compiled-environment-and-tests/Default.venvironment -o ./compiled-environment-and-tests/
 
       # upload the compiled environment and test units as an artifact
       - name: Export compiled-environment-and-tests
@@ -71,12 +71,17 @@ jobs:
   # Job to run the simulation tests
   run-tests-simulation:
     name: Run simulation
-    if: false  # temporarily disabled: requires SUT artifact
     needs: build-simulation
     runs-on: canoe-large
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Fetch SUT artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: SUT
+          path: SUT
 
       - name: Fetch compiled-environment-and-tests artifact
         uses: actions/download-artifact@v4
@@ -86,12 +91,27 @@ jobs:
 
       - name: Run CANoe Server Edition
         id: canoese
+        shell: powershell
+        continue-on-error: true
         run: |
-          & canoe-se ./compiled-environment-and-tests/Default.venvironment -d ./simulation --test-unit ./compiled-environment-and-tests/SoftwareTest.vtestunit
-          Write-Host "CANoe Server Edition returned exit code $LASTEXITCODE"
+          $envPath = Get-ChildItem -Path . -Recurse -Filter 'Default.venvironment' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $envPath) { Write-Error "Default.venvironment not found after artifact download"; exit 1 }
+          $tuPath = Get-ChildItem -Path . -Recurse -Filter 'SoftwareTest.vtestunit' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+          if (-not $tuPath) { Write-Error "SoftwareTest.vtestunit not found after artifact download"; exit 1 }
+          New-Item -ItemType Directory -Force -Path ./simulation/TestReports | Out-Null
+          $reportDir = Resolve-Path ./simulation/TestReports
+          $reportPath = Join-Path $reportDir "SoftwareTest.vtestreport"
+          Write-Host "Using environment: $envPath"
+          Write-Host "Using test unit: $tuPath"
+          Write-Host "vTEST report will be written under: $reportDir"
+          & canoe-se "$envPath" -d ./simulation --test-unit "$tuPath"
+          $code = $LASTEXITCODE
+          Write-Host "CANoe Server Edition returned exit code $code"
+          "exitcode=$code" >> $env:GITHUB_OUTPUT
+          exit 0
 
       - name: Export test reports
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: Test Reports
@@ -100,23 +120,37 @@ jobs:
           retention-days: 7
 
       - name: Upload log files
-        if: ${{ !cancelled() }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: Log Files
           path: ./simulation/*.txt
 
+
+      - name: Finalize test status
+        if: ${{ steps.canoese.outputs.exitcode != '0' && !cancelled() }}
+        shell: powershell
+        run: |
+          Write-Host "Marking job as failed because CANoe exit code was ${{ steps.canoese.outputs.exitcode }}"
+          exit 1
+
   # Job to display the test report
   display-test-report:
+    if: ${{ always() }}
     name: Display test report
-    if: false  # temporarily disabled: requires SUT/results
     needs: run-tests-simulation
     runs-on: canoe-small
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Ensure report directory exists
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path ./simulation/TestReports | Out-Null
+
       - name: Fetch test report artifact
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: Test Reports
@@ -124,16 +158,105 @@ jobs:
 
       - name: Convert all test reports to XUnit format
         working-directory: ./simulation/TestReports/
+        shell: powershell
         run: |
           get-childitem . -Filter *.vtestreport | foreach {
             ReportViewerCli -r $_ -xu
           }
 
+      - name: Create HTML reports from XUnit XML
+        working-directory: ./simulation/TestReports/
+        shell: powershell
+        run: |
+          $xsl = @'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+            <xsl:output method="html" encoding="UTF-8" />
+            <xsl:template match="/">
+              <html>
+                <head>
+                  <meta charset="utf-8" />
+                  <title>Test Report</title>
+                  <style>
+                    body { font-family: Arial, sans-serif; margin: 1rem 2rem; }
+                    table { border-collapse: collapse; width: 100%; }
+                    th, td { border: 1px solid #ccc; padding: .4rem .6rem; text-align: left; }
+                    th { background: #f7f7f7; }
+                    .pass { color: #2e7d32; }
+                    .fail { color: #c62828; }
+                    .skip { color: #6a1b9a; }
+                  </style>
+                </head>
+                <body>
+                  <h1>Test Report</h1>
+                  <p>
+                    Suites: <strong><xsl:value-of select="count(//*[local-name()='testsuite'])"/></strong> |
+                    Tests: <strong><xsl:value-of select="sum(//*[local-name()='testsuite']/@tests)"/></strong> |
+                    Failures: <strong><xsl:value-of select="sum(//*[local-name()='testsuite']/@failures)"/></strong> |
+                    Errors: <strong><xsl:value-of select="sum(//*[local-name()='testsuite']/@errors)"/></strong> |
+                    Skipped: <strong><xsl:value-of select="sum(//*[local-name()='testsuite']/@skipped)"/></strong> |
+                    Time: <strong><xsl:value-of select="format-number(sum(//*[local-name()='testcase']/@time), '0.000')"/></strong>s
+                  </p>
+                  <table>
+                    <tr><th>Suite</th><th>Case</th><th>Status</th><th>Time (s)</th><th>Message</th></tr>
+                    <xsl:for-each select="//*[local-name()='testcase']">
+                      <tr>
+                        <td><xsl:value-of select="../@name" /></td>
+                        <td><xsl:value-of select="@name" /></td>
+                        <td>
+                          <xsl:choose>
+                            <xsl:when test="*[local-name()='failure']"><span class="fail">FAIL</span></xsl:when>
+                            <xsl:when test="*[local-name()='error']"><span class="fail">ERROR</span></xsl:when>
+                            <xsl:when test="*[local-name()='skipped']"><span class="skip">SKIPPED</span></xsl:when>
+                            <xsl:otherwise><span class="pass">PASS</span></xsl:otherwise>
+                          </xsl:choose>
+                        </td>
+                        <td><xsl:value-of select="@time"/></td>
+                        <td><xsl:value-of select="(./*[local-name()='failure']/@message | ./*[local-name()='error']/@message | ./*[local-name()='skipped']/@message)[1]"/></td>
+                      </tr>
+                    </xsl:for-each>
+                  </table>
+                </body>
+              </html>
+            </xsl:template>
+          </xsl:stylesheet>
+          '@
+          Set-Content -Path "junit-report.xsl" -Value $xsl -Encoding UTF8
+
+          Get-ChildItem -Filter "*_xunit.xml" | ForEach-Object {
+            $in = $_.FullName
+            $outHtml = [System.IO.Path]::ChangeExtension($in, ".html")
+            $xslPath = Join-Path $_.DirectoryName "junit-report.xsl"
+            $xslt = New-Object System.Xml.Xsl.XslCompiledTransform
+            $xslt.Load($xslPath)
+            $xslt.Transform($in, $outHtml)
+          }
+
+      - name: Upload test results bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-bundle
+          path: |
+            ./simulation/TestReports/*_xunit.xml
+            ./simulation/TestReports/*.html
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Display test results
+        if: ${{ always() }}
         uses: dorny/test-reporter@v1.9.1
         with:
           name: Test results
           path: "./simulation/TestReports/*_xunit.xml"
           reporter: java-junit
           fail-on-error: 'false'
+
+
+
+
+
+
+
+
+
 
