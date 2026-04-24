@@ -164,33 +164,54 @@ jobs:
         working-directory: ./simulation/TestReports/
         shell: powershell
         run: |
+          $ErrorActionPreference = 'Continue'
+
           $reports = Get-ChildItem -Filter *.vtestreport
           if (-not $reports) {
             Write-Host "No .vtestreport files found to export to HTML."
             exit 0
           }
 
+          # Show CLI help (first lines) to the log to identify supported switches on the runner
+          try {
+            $help = & ReportViewerCli -? 2>&1 | Out-String
+            Write-Host "ReportViewerCli help (first 80 lines):"
+            $help -split "`n" | Select-Object -First 80 | ForEach-Object { Write-Host $_ }
+          } catch {}
+
+          $patterns = @(
+            { param($i,$o) & ReportViewerCli -r $i -html -o $o },
+            { param($i,$o) & ReportViewerCli -r $i -html },
+            { param($i,$o) & ReportViewerCli -r $i -e html -o $o },
+            { param($i,$o) & ReportViewerCli -r $i -export html -o $o },
+            { param($i,$o) & ReportViewerCli -r $i --export html -o $o },
+            { param($i,$o) & ReportViewerCli -r $i -f html -o $o },
+            { param($i,$o) & ReportViewerCli -r $i --format html -o $o },
+            { param($i,$o) & ReportViewerCli -r $i /html /o:$o }
+          )
+
           foreach ($r in $reports) {
             $in = $r.FullName
             $out = [System.IO.Path]::ChangeExtension($in, ".html")
+            Remove-Item -Force -ErrorAction SilentlyContinue $out
 
-            Write-Host "Attempting HTML export via ReportViewerCli for $($r.Name)"
-            # Try with explicit output first
-            ReportViewerCli -r $in -html -o $out
+            Write-Host "Exporting HTML for $($r.Name)"
 
-            if (!(Test-Path $out)) {
-              # Try without -o (some versions auto-name the file)
-              ReportViewerCli -r $in -html
-              $defaultOut = [System.IO.Path]::ChangeExtension($in, ".html")
-              if (Test-Path $defaultOut) { $out = $defaultOut }
+            $exported = $false
+            foreach ($p in $patterns) {
+              try { & $p.Invoke($in,$out) | Out-Null } catch {}
+              if (Test-Path $out) { $exported = $true; break }
             }
 
-            if (Test-Path $out) {
+            if ($exported) {
               Write-Host "Created HTML: $out"
             } else {
-              Write-Warning "HTML export did not produce a file for $($r.Name). Check ReportViewerCli help for the correct HTML switch."
+              Write-Warning "Could not export HTML for $($r.Name). Please check the help above for the correct switch and let us know."
             }
           }
+
+          exit 0
+
 
       - name: Upload test results bundle
         uses: actions/upload-artifact@v4
@@ -199,8 +220,10 @@ jobs:
           path: |
             ./simulation/TestReports/*_xunit.xml
             ./simulation/TestReports/*.html
+            ./simulation/TestReports/*.vtestreport
           if-no-files-found: warn
           retention-days: 7
+
 
       - name: Display test results
         if: ${{ always() }}
